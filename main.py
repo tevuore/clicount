@@ -4,9 +4,13 @@ import os
 import sys
 import argparse
 import yaml
+from tabulate import tabulate
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Interactive questionnaire that saves responses to a CSV file.')
+    parser.add_argument('command', nargs='?', default='write',
+                       choices=['write', 'show'],
+                       help='Command to execute: write (default) or show')
     parser.add_argument('csv_file', nargs='?', default='responses.csv',
                        help='Name of the CSV file to store responses (default: responses.csv)')
     parser.add_argument('--categories', default='categories.yaml',
@@ -136,8 +140,59 @@ def save_to_csv(filename, headers, answers):
     
     print(f"\nResponses have been saved to {filename}")
 
+def show_entries(filename):
+    if not os.path.exists(filename):
+        print(f"Error: File {filename} does not exist")
+        return
+        
+    try:
+        with open(filename, 'r', newline='') as csvfile:
+            # First validate CSV format by reading all lines
+            content = csvfile.read()
+            if not content.strip():
+                print("Error: CSV file is empty")
+                return
+                
+            # Try parsing as CSV
+            try:
+                reader = csv.reader(content.splitlines())
+                headers = next(reader)
+                if not headers:
+                    print("Error: Invalid CSV format - no headers found")
+                    return
+                    
+                # Read and validate data
+                data = []
+                header_count = len(headers)
+                for row in reader:
+                    if len(row) != header_count:
+                        print("Error: Invalid CSV format - inconsistent number of columns")
+                        return
+                    data.append(row)
+                    
+            except (csv.Error, StopIteration) as e:
+                print(f"Error: Invalid CSV format - {str(e)}")
+                return
+            
+            if not data:
+                print("No entries found in the file.")
+                return
+                
+            print(f"\nEntries from {filename}:")
+            print(tabulate(data, headers=headers, tablefmt='grid'))
+            print(f"\nTotal entries: {len(data)}")
+            
+    except Exception as e:
+        print(f"Error reading file: {str(e)}")
+
 def main():
     args = parse_arguments()
+    
+    if args.command == 'show':
+        show_entries(args.csv_file)
+        return
+        
+    # Default 'write' command
     headers = get_headers(args.csv_file)
     categories = load_categories(args.categories)
     
