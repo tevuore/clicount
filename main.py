@@ -99,6 +99,39 @@ def load_categories(filename):
         print(f"Warning: Error parsing {filename}, using empty categories")
         return {}
 
+def flatten_categories(category_dict, prefix='', result=None):
+    """Convert nested category dictionary into a flat list with full paths."""
+    if result is None:
+        result = []
+    
+    if not category_dict:
+        return result
+    
+    for key, value in category_dict.items():
+        if not isinstance(value, list):
+            continue
+        
+        for item in value:
+            if isinstance(item, str):
+                # Simple category
+                result.append(item)
+            elif isinstance(item, dict):
+                # Nested category
+                for subkey, subvalue in item.items():
+                    if isinstance(subvalue, list):
+                        # Process each item in the subvalue list
+                        for subitem in subvalue:
+                            if isinstance(subitem, str):
+                                result.append(f"{subkey}.{subitem}")
+                            elif isinstance(subitem, dict):
+                                # Handle one more level of nesting
+                                for subsubkey, subsubvalue in subitem.items():
+                                    if isinstance(subsubvalue, list):
+                                        for subsubitem in subsubvalue:
+                                            result.append(f"{subkey}.{subsubkey}.{subsubitem}")
+    
+    return result
+
 def get_headers(filename):
     default_headers = ["Name", "Age", "Email", "Occupation"]
     
@@ -119,30 +152,33 @@ def get_headers(filename):
 def get_category_value(header, categories):
     if header not in categories:
         return None
-        
-    values = categories[header]
+    
+    # Flatten the nested structure for the specific header
+    flat_categories = flatten_categories({header: categories[header]})
+    
     while True:
         print(f"\nAvailable options for {header}:")
-        for i, value in enumerate(values, 1):
+        for i, value in enumerate(flat_categories, 1):
             print(f"{i}. {value}")
-            
+        
         try:
-            choice = int(input(f"\nSelect {header} (1-{len(values)}): "))
-            if 1 <= choice <= len(values):
-                return values[choice - 1]
+            choice = int(input(f"\nSelect {header} (1-{len(flat_categories)}): "))
+            if 1 <= choice <= len(flat_categories):
+                return flat_categories[choice - 1]
             print("Invalid choice. Please try again.")
         except ValueError:
             print("Please enter a valid number.")
 
 def get_user_input(headers, categories):
+    """Get user input for all fields."""
     answers = []
     for header in headers:
-        # Check if this header has predefined categories
-        category_value = get_category_value(header, categories)
-        if category_value is not None:
-            answers.append(category_value)
+        if header in categories:
+            # Use category selection for fields with predefined categories
+            value = get_category_value(header, categories)
+            answers.append(value)
         else:
-            # If no category defined, ask for free-form input
+            # Free-form input for fields without categories
             question = f"What is your {header.lower()}?"
             answer = input(f"{question} ")
             answers.append(answer)

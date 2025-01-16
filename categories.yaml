@@ -1,7 +1,14 @@
 Category:
   - food
   - transport
+    - public
+    - taxi
+    - train
   - entertainment
+    - magazine
+      - Linux Format
+    - movie
+    - concert
   - utilities
   - other
 
