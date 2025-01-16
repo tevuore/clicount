@@ -59,7 +59,37 @@ def test_argument_parsing_no_args(monkeypatch, capsys):
         parse_arguments()
     
     captured = capsys.readouterr()
-    assert "error: the following arguments are required: csv_file" in captured.err
+    assert "error: CSV file is required for write command" in captured.err
+
+def test_argument_parsing_help_command(monkeypatch, capsys):
+    """Test help command output."""
+    test_args = ['script.py', 'help']
+    monkeypatch.setattr(sys, 'argv', test_args)
+    
+    with pytest.raises(SystemExit) as e:
+        parse_arguments()
+    assert e.value.code == 0
+    
+    captured = capsys.readouterr()
+    output = captured.out
+    
+    # Check if help output contains essential information
+    assert "Available Commands" in output
+    assert "write" in output
+    assert "show" in output
+    assert "Description" in output
+    assert "Usage" in output
+    assert "Example" in output
+    assert "--categories" in output
+
+def test_argument_parsing_invalid_command(monkeypatch, capsys):
+    """Test parsing with invalid command."""
+    test_args = ['script.py', 'invalid']
+    monkeypatch.setattr(sys, 'argv', test_args)
+    
+    args = parse_arguments()
+    assert args.command == 'write'  # Should default to write
+    assert args.csv_file == 'invalid'  # Invalid command becomes the CSV file
 
 def test_show_entries_with_data(sample_csv):
     """Test showing entries from a CSV file with data."""

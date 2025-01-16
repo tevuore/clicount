@@ -6,6 +6,50 @@ import argparse
 import yaml
 from tabulate import tabulate
 
+COMMANDS = {
+    'write': {
+        'description': '[Default] Add new entries to a CSV file with interactive prompts',
+        'usage': 'write <csv_file>',
+        'example': 'write expenses.csv'
+    },
+    'show': {
+        'description': 'Display entries from a CSV file in a formatted table',
+        'usage': 'show <csv_file>',
+        'example': 'show expenses.csv'
+    },
+    'help': {
+        'description': 'Show this help message with detailed command information',
+        'usage': 'help',
+        'example': 'help'
+    }
+}
+
+def show_help():
+    """Display detailed help information about available commands."""
+    print("\nAvailable Commands:")
+    print("-" * 80)
+    
+    rows = []
+    for cmd, info in COMMANDS.items():
+        rows.append([
+            cmd,
+            info['description'],
+            info['usage'],
+            info['example']
+        ])
+    
+    print(tabulate(rows, 
+                  headers=['Command', 'Description', 'Usage', 'Example'],
+                  tablefmt='grid'))
+    
+    print("\nOptions:")
+    print("  --categories FILE  Specify a YAML file containing category definitions")
+    print("                    (default: categories.yaml)")
+    print("\nNotes:")
+    print("- If no command is specified, 'write' is assumed")
+    print("- Categories in the YAML file will be used for matching column names")
+    print("- CSV file is required for all commands except 'help'\n")
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description='CSV-based questionnaire with category support.',
@@ -15,21 +59,32 @@ Examples:
   %(prog)s write expenses.csv          # Add new entries to expenses.csv
   %(prog)s show expenses.csv           # Display entries from expenses.csv
   %(prog)s expenses.csv                # Same as 'write expenses.csv'
+  %(prog)s help                        # Show detailed command information
         """)
     
     parser.add_argument('command', nargs='?', default='write',
-                       help='Command to execute: write or show. If omitted, defaults to write')
-    parser.add_argument('csv_file', help='CSV file to read from or write to')
+                       help='Command to execute: write, show, or help. If omitted, defaults to write')
+    parser.add_argument('csv_file', nargs='?',
+                       help='CSV file to read from or write to (required except for help command)')
     parser.add_argument('--categories', default='categories.yaml',
                        help='YAML file containing category definitions (default: categories.yaml)')
     
     # Parse arguments
     args = parser.parse_args()
     
-    # If first argument is not a command, treat it as the CSV file
-    if args.command not in ['write', 'show']:
+    # Handle help command
+    if args.command == 'help':
+        show_help()
+        sys.exit(0)
+    
+    # If first argument is not a valid command, treat it as the CSV file
+    if args.command not in COMMANDS:
         args.csv_file = args.command
         args.command = 'write'
+    
+    # Validate CSV file is provided for non-help commands
+    if not args.csv_file:
+        parser.error("CSV file is required for {} command".format(args.command))
     
     return args
 
