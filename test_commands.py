@@ -1,9 +1,10 @@
 import pytest
 import csv
 import os
+import sys
 from io import StringIO
-from contextlib import redirect_stdout
-from main import show_entries, save_to_csv
+from contextlib import redirect_stdout, redirect_stderr
+from main import show_entries, save_to_csv, parse_arguments
 
 @pytest.fixture
 def sample_csv(tmp_path):
@@ -21,6 +22,44 @@ def sample_csv(tmp_path):
         writer.writerows(data)
     
     return str(csv_file)
+
+def test_argument_parsing_write_command(monkeypatch):
+    """Test parsing write command with CSV file."""
+    test_args = ['script.py', 'write', 'test.csv']
+    monkeypatch.setattr(sys, 'argv', test_args)
+    
+    args = parse_arguments()
+    assert args.command == 'write'
+    assert args.csv_file == 'test.csv'
+
+def test_argument_parsing_show_command(monkeypatch):
+    """Test parsing show command with CSV file."""
+    test_args = ['script.py', 'show', 'test.csv']
+    monkeypatch.setattr(sys, 'argv', test_args)
+    
+    args = parse_arguments()
+    assert args.command == 'show'
+    assert args.csv_file == 'test.csv'
+
+def test_argument_parsing_csv_only(monkeypatch):
+    """Test parsing with just CSV file (should default to write)."""
+    test_args = ['script.py', 'test.csv']
+    monkeypatch.setattr(sys, 'argv', test_args)
+    
+    args = parse_arguments()
+    assert args.command == 'write'
+    assert args.csv_file == 'test.csv'
+
+def test_argument_parsing_no_args(monkeypatch, capsys):
+    """Test parsing with no arguments (should show error)."""
+    test_args = ['script.py']
+    monkeypatch.setattr(sys, 'argv', test_args)
+    
+    with pytest.raises(SystemExit):
+        parse_arguments()
+    
+    captured = capsys.readouterr()
+    assert "error: the following arguments are required: csv_file" in captured.err
 
 def test_show_entries_with_data(sample_csv):
     """Test showing entries from a CSV file with data."""

@@ -7,15 +7,31 @@ import yaml
 from tabulate import tabulate
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Interactive questionnaire that saves responses to a CSV file.')
+    parser = argparse.ArgumentParser(
+        description='CSV-based questionnaire with category support.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s write expenses.csv          # Add new entries to expenses.csv
+  %(prog)s show expenses.csv           # Display entries from expenses.csv
+  %(prog)s expenses.csv                # Same as 'write expenses.csv'
+        """)
+    
     parser.add_argument('command', nargs='?', default='write',
-                       choices=['write', 'show'],
-                       help='Command to execute: write (default) or show')
-    parser.add_argument('csv_file', nargs='?', default='responses.csv',
-                       help='Name of the CSV file to store responses (default: responses.csv)')
+                       help='Command to execute: write or show. If omitted, defaults to write')
+    parser.add_argument('csv_file', help='CSV file to read from or write to')
     parser.add_argument('--categories', default='categories.yaml',
                        help='YAML file containing category definitions (default: categories.yaml)')
-    return parser.parse_args()
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # If first argument is not a command, treat it as the CSV file
+    if args.command not in ['write', 'show']:
+        args.csv_file = args.command
+        args.command = 'write'
+    
+    return args
 
 def load_categories(filename):
     if not os.path.exists(filename):
