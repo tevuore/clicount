@@ -1,0 +1,20 @@
+Category:
+  - food
+  - transport
+  - entertainment
+  - utilities
+  - other
+
+Account:
+  - savings
+  - checking
+  - credit card
+  - cash
+  - crypto wallet
+
+PaymentType:
+  - cash
+  - credit card
+  - debit card
+  - bank transfer
+  - mobile payment

@@ -3,12 +3,26 @@ from datetime import datetime
 import os
 import sys
 import argparse
+import yaml
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Interactive questionnaire that saves responses to a CSV file.')
     parser.add_argument('csv_file', nargs='?', default='responses.csv',
                        help='Name of the CSV file to store responses (default: responses.csv)')
+    parser.add_argument('--categories', default='categories.yaml',
+                       help='YAML file containing category definitions (default: categories.yaml)')
     return parser.parse_args()
+
+def load_categories(filename):
+    if not os.path.exists(filename):
+        return {}
+    
+    try:
+        with open(filename, 'r') as f:
+            return yaml.safe_load(f) or {}
+    except yaml.YAMLError:
+        print(f"Warning: Error parsing {filename}, using empty categories")
+        return {}
 
 def get_headers(filename):
     default_headers = ["Name", "Age", "Email", "Occupation"]
@@ -27,13 +41,36 @@ def get_headers(filename):
         except StopIteration:
             return default_headers
 
-def get_user_input(headers):
+def get_category_value(header, categories):
+    if header not in categories:
+        return None
+        
+    values = categories[header]
+    while True:
+        print(f"\nAvailable options for {header}:")
+        for i, value in enumerate(values, 1):
+            print(f"{i}. {value}")
+            
+        try:
+            choice = int(input(f"\nSelect {header} (1-{len(values)}): "))
+            if 1 <= choice <= len(values):
+                return values[choice - 1]
+            print("Invalid choice. Please try again.")
+        except ValueError:
+            print("Please enter a valid number.")
+
+def get_user_input(headers, categories):
     answers = []
     for header in headers:
-        # Convert header to question format
-        question = f"What is your {header.lower()}?"
-        answer = input(f"{question} ")
-        answers.append(answer)
+        # Check if this header has predefined categories
+        category_value = get_category_value(header, categories)
+        if category_value is not None:
+            answers.append(category_value)
+        else:
+            # If no category defined, ask for free-form input
+            question = f"What is your {header.lower()}?"
+            answer = input(f"{question} ")
+            answers.append(answer)
     return answers
 
 def print_summary(headers, answers):
@@ -43,7 +80,7 @@ def print_summary(headers, answers):
         print(f"{header}: {answer}")
     print("-" * 30)
 
-def edit_answers(headers, answers):
+def edit_answers(headers, answers, categories):
     while True:
         print("\nWhich field would you like to edit?")
         for i, header in enumerate(headers, 1):
@@ -55,8 +92,14 @@ def edit_answers(headers, answers):
             if choice == 0:
                 break
             if 1 <= choice <= len(headers):
-                new_value = input(f"Enter new value for {headers[choice-1]}: ")
-                answers[choice-1] = new_value
+                header = headers[choice-1]
+                # Check if this header has predefined categories
+                category_value = get_category_value(header, categories)
+                if category_value is not None:
+                    answers[choice-1] = category_value
+                else:
+                    new_value = input(f"Enter new value for {header}: ")
+                    answers[choice-1] = new_value
                 print_summary(headers, answers)
             else:
                 print("Invalid choice. Please try again.")
@@ -96,12 +139,13 @@ def save_to_csv(filename, headers, answers):
 def main():
     args = parse_arguments()
     headers = get_headers(args.csv_file)
+    categories = load_categories(args.categories)
     
     while True:
         print(f"\nWelcome to the questionnaire! (saving to {args.csv_file})")
         print("Please answer the following questions:\n")
         
-        answers = get_user_input(headers)
+        answers = get_user_input(headers, categories)
         print_summary(headers, answers)
         
         while True:
@@ -109,17 +153,23 @@ def main():
             print("1. Edit values")
             print("2. Save and enter next entry")
             print("3. Save and quit")
+            print("4. Cancel this entry")
             
-            choice = input("\nEnter your choice (1-3): ")
+            choice = input("\nEnter your choice (1-4): ")
             
             if choice == "1":
-                answers = edit_answers(headers, answers)
+                answers = edit_answers(headers, answers, categories)
             elif choice == "2":
                 save_to_csv(args.csv_file, headers, answers)
                 break
             elif choice == "3":
                 save_to_csv(args.csv_file, headers, answers)
                 return
+            elif choice == "4":
+                print("\nEntry cancelled. No data was saved.")
+                if input("\nWould you like to enter a new entry? (y/n): ").lower() != 'y':
+                    return
+                break
             else:
                 print("Invalid choice. Please try again.")
 
