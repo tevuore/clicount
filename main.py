@@ -316,8 +316,6 @@ def get_category_value(header, categories):
     
     # Get flattened list of categories
     flat_categories = flatten_categories({header: categories[header]})
-    print("### DEBUG: categories", categories)
-    print("### DEBUG: Flat categories:", flat_categories)
     while True:
         print(f"\nAvailable options for {header}:")
         for i, value in enumerate(flat_categories, 1):
