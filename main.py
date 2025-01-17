@@ -88,15 +88,60 @@ Examples:
     
     return args
 
-def load_categories(filename):
-    if not os.path.exists(filename):
+def process_yaml_dict(data, prefix=''):
+    """Process a YAML dictionary and its nested structure into dot-notation paths."""
+    result = []
+    
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                # Process nested dictionary
+                for key, value in item.items():
+                    key_path = f"{prefix}.{key}" if prefix else key
+                    result.append(key_path)
+                    result.extend(process_yaml_dict(value, key_path))
+            else:
+                # Simple list item
+                result.append(f"{prefix}.{item}" if prefix else item)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            key_path = f"{prefix}.{key}" if prefix else key
+            result.append(key_path)
+            result.extend(process_yaml_dict(value, key_path))
+    
+    return result
+
+def load_categories(categories_file='categories.yaml'):
+    """Load categories from YAML file."""
+    if not os.path.exists(categories_file):
         return {}
     
     try:
-        with open(filename, 'r') as f:
-            return yaml.safe_load(f) or {}
+        with open(categories_file, 'r') as f:
+            data = yaml.safe_load(f)
+            if not isinstance(data, dict):
+                return {}
+            
+            result = {}
+            for category, items in data.items():
+                if not isinstance(items, list):
+                    continue
+                
+                processed = []
+                for item in items:
+                    if isinstance(item, str):
+                        processed.append(item)
+                    elif isinstance(item, dict):
+                        # Item is a dictionary with nested structure
+                        for key, value in item.items():
+                            processed.append(key)
+                            processed.extend(process_yaml_dict(value, key))
+                
+                if processed:
+                    result[category] = sorted(list(set(processed)))
+            
+            return result
     except yaml.YAMLError:
-        print(f"Warning: Error parsing {filename}, using empty categories")
         return {}
 
 def flatten_categories(category_dict, prefix='', result=None):
@@ -107,81 +152,53 @@ def flatten_categories(category_dict, prefix='', result=None):
     if not category_dict:
         return result
     
-    for key, value in category_dict.items():
-        if not isinstance(value, list):
+    for key, values in category_dict.items():
+        if not isinstance(values, list):
             continue
         
-        for item in value:
+        for item in values:
             if isinstance(item, str):
-                # Simple category
-                result.append(item)
-            elif isinstance(item, dict):
-                # Nested category
-                for subkey, subvalue in item.items():
-                    if isinstance(subvalue, list):
-                        # Process each item in the subvalue list
-                        for subitem in subvalue:
-                            if isinstance(subitem, str):
-                                result.append(f"{subkey}.{subitem}")
-                            elif isinstance(subitem, dict):
-                                # Handle one more level of nesting
-                                for subsubkey, subsubvalue in subitem.items():
-                                    if isinstance(subsubvalue, list):
-                                        for subsubitem in subsubvalue:
-                                            result.append(f"{subkey}.{subsubkey}.{subsubitem}")
+                if '.' in item:
+                    # Already flattened path
+                    result.append(item)
+                else:
+                    # Simple category
+                    path = f"{prefix}.{item}" if prefix else item
+                    result.append(path)
+            elif isinstance(item, list):
+                # This is a list of subcategories for the previous item
+                if result:
+                    parent = result[-1]
+                    result.extend([f"{parent}.{child}" for child in item])
     
-    return result
+    return sorted(list(set(result)))  # Remove duplicates and sort
 
 def get_headers(filename):
-    default_headers = ["Name", "Age", "Email", "Occupation"]
+    """Get headers from CSV file or return default headers."""
+    default_headers = ["Amount", "Category", "Account"]
     
-    if not os.path.exists(filename):
-        return default_headers
-        
-    with open(filename, 'r', newline='') as csvfile:
-        reader = csv.reader(csvfile)
-        try:
-            headers = next(reader)
-            # Remove timestamp column if it exists
-            if headers[0].lower() == "timestamp":
-                headers = headers[1:]
+    try:
+        with open(filename, 'r', newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            headers = next(reader)[1:]  # Skip timestamp column
             return headers if headers else default_headers
-        except StopIteration:
-            return default_headers
-
-def get_category_value(header, categories):
-    if header not in categories:
-        return None
-    
-    # Flatten the nested structure for the specific header
-    flat_categories = flatten_categories({header: categories[header]})
-    
-    while True:
-        print(f"\nAvailable options for {header}:")
-        for i, value in enumerate(flat_categories, 1):
-            print(f"{i}. {value}")
-        
-        try:
-            choice = int(input(f"\nSelect {header} (1-{len(flat_categories)}): "))
-            if 1 <= choice <= len(flat_categories):
-                return flat_categories[choice - 1]
-            print("Invalid choice. Please try again.")
-        except ValueError:
-            print("Please enter a valid number.")
+    except (FileNotFoundError, StopIteration):
+        return default_headers
 
 def get_user_input(headers, categories):
     """Get user input for all fields."""
     answers = []
+    
     for header in headers:
         if header in categories:
-            # Use category selection for fields with predefined categories
+            print(f"\nSelect {header}:")
             value = get_category_value(header, categories)
             answers.append(value)
         else:
-            # Free-form input for fields without categories
             question = f"What is your {header.lower()}?"
             answer = input(f"{question} ")
             answers.append(answer)
+    
     return answers
 
 def print_summary(headers, answers):
@@ -292,6 +309,28 @@ def show_entries(filename):
     except Exception as e:
         print(f"Error reading file: {str(e)}")
 
+def get_category_value(header, categories):
+    """Get category value with proper path handling."""
+    if header not in categories:
+        return None
+    
+    # Get flattened list of categories
+    flat_categories = flatten_categories({header: categories[header]})
+    print("### DEBUG: categories", categories)
+    print("### DEBUG: Flat categories:", flat_categories)
+    while True:
+        print(f"\nAvailable options for {header}:")
+        for i, value in enumerate(flat_categories, 1):
+            print(f"{i}. {value}")
+        
+        try:
+            choice = int(input(f"\nSelect {header} (1-{len(flat_categories)}): "))
+            if 1 <= choice <= len(flat_categories):
+                return flat_categories[choice - 1]
+            print("Invalid choice. Please try again.")
+        except ValueError:
+            print("Please enter a valid number.")
+
 def main():
     args = parse_arguments()
     
@@ -302,6 +341,7 @@ def main():
     # Default 'write' command
     headers = get_headers(args.csv_file)
     categories = load_categories(args.categories)
+    print("\nCategories loaded:", categories)
     
     while True:
         print(f"\nWelcome to the questionnaire! (saving to {args.csv_file})")

@@ -1,16 +1,17 @@
 Category:
   - food
-  - transport
-    - public
-    - taxi
-    - train
-  - entertainment
-    - magazine
-      - Linux Format
-    - movie
-    - concert
+  - transport:
+      - public
+      - taxi
+      - train
+  - entertainment:
+      - magazine:
+          - Linux Format
+      - movie
+      - concert
   - utilities
   - other
+
 
 Account:
   - savings
